@@ -1,6 +1,9 @@
 package com.gabify.co.backsnapsnack.Controllers;
 
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -8,34 +11,46 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.gabify.co.backsnapsnack.Assembler.ProductModelAssembler;
 import com.gabify.co.backsnapsnack.Model.Product;
 import com.gabify.co.backsnapsnack.Repo.ProductRepository;
 import com.gabify.co.backsnapsnack.NotFoundException.ProductNotFoundException;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 public class ProductController {
 
     private final ProductRepository productRepo;
+    private final ProductModelAssembler assembler;
 
-    ProductController(ProductRepository productRepository){
+    ProductController(ProductRepository productRepository, ProductModelAssembler assembler){
         this.productRepo = productRepository;
+        this.assembler = assembler;
     }
 
     //http://localhost:8080/products
     //Return all products
     @GetMapping("/products")
-    public List<Product> getProducts(){
-        return productRepo.findAll();
+    public CollectionModel<EntityModel<Product>> getProducts(){
+        List<EntityModel<Product>> products = productRepo.findAll().stream()
+        .map(assembler::toModel)
+        .collect(Collectors.toList());
+
+        return CollectionModel.of(products,
+        linkTo(methodOn(ProductController.class).getProducts()).withSelfRel());
     }
 
     //http://localhost:8080/product/25
     //Return one product
     @GetMapping("/product/{id}")
-    public Product getProduct(@PathVariable Long id){
-        return productRepo.findById(id)
+    public EntityModel<Product> getProduct(@PathVariable Long id){
+        Product product = productRepo.findById(id)
         .orElseThrow(() -> new ProductNotFoundException(id));
+
+        return assembler.toModel(product);
     }
 
     //http://localhost:8080/product/new
